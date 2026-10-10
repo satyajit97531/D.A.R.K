@@ -1,0 +1,6 @@
+{
+  "name": "ULTRON Orb UI",
+  "description": "An Iron Man-inspired holographic orb built with Three.js, MediaPipe hand tracking, and futuristic holographic HUD controls.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
