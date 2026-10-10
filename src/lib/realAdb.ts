@@ -23,7 +23,7 @@ class RealAdbController {
   public status: AdbStatus = {
     isConnected: false,
     isConnecting: false,
-    deviceName: "Redmi 13C 5G",
+    deviceName: "Device",
     mode: "direct",
     error: null,
     lastCommand: null,
@@ -92,7 +92,7 @@ class RealAdbController {
       this.adb = new Adb(transport);
 
       // Query real device model property
-      let detectedName = "Redmi 13C 5G";
+      let detectedName = "Android Device";
       try {
         const prop = await this.adb.getProp("ro.product.model");
         if (prop && prop.trim()) {
@@ -189,7 +189,7 @@ class RealAdbController {
     }
   }
 
-  // High-level mobile tasks for Redmi 13C 5G
+  // High-level mobile tasks for connected device
   public async unlockPhone(): Promise<{ success: boolean; output?: string }> {
     if (!this.status.isConnected) {
       return { success: true, output: "DEVICE_STANDALONE" };
@@ -298,7 +298,7 @@ class RealAdbController {
       isConnected: true,
       mode: "wifi",
       wifiIp: ip,
-      deviceName: `Redmi 13C 5G (${ip})`,
+      deviceName: `Device (${ip})`,
       error: null,
     });
   }

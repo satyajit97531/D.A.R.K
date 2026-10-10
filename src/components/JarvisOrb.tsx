@@ -6,7 +6,6 @@ import { HandTracker, type TrackerStatus } from "@/lib/handTracker";
 import { ultronAudio } from "@/lib/ultronAudio";
 import { realAdb, type AdbStatus } from "@/lib/realAdb";
 import { launchApp, isMobileDevice } from "@/lib/appLauncher";
-import { AudioHologramPanel } from "@/components/AudioHologramPanel";
 import {
   Mic,
   MicOff,
@@ -14,6 +13,7 @@ import {
   VolumeX,
   Flame,
   Radio,
+  X,
 } from "lucide-react";
 
 type CameraState = "off" | "starting" | "on" | "error";
@@ -54,6 +54,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
   const [orbTheme, setOrbTheme] = useState<"amber" | "crimson_red" | "cyan">("cyan");
   const [floatingKeyword, setFloatingKeyword] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [showWifiCard, setShowWifiCard] = useState(false);
 
   // Poll bridge status for connected mobile phone over Wi-Fi
   useEffect(() => {
@@ -167,7 +168,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
     });
   }, []);
 
-  // Execute Commands on real Redmi 13C 5G
+  // Execute Commands on real device
   const executeHardwareCommands = useCallback(
     async (commands: any[]) => {
       if (!commands || !Array.isArray(commands)) return;
@@ -176,7 +177,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         if (cmd.type === "OPEN_APP") {
           const app = (cmd.app || "youtube").toLowerCase();
           ultronAudio.playAppLaunch();
-          setDeviceToast(`TRANSMITTED TO REDMI 13C 5G VIA WI-FI: OPEN ${app.toUpperCase()}`);
+          setDeviceToast(`TRANSMITTED TO DEVICE VIA WI-FI: OPEN ${app.toUpperCase()}`);
           setTimeout(() => setDeviceToast(null), 4500);
 
           // 1. Dispatch over bridge to mobile phone (NEVER opens on laptop!)
@@ -185,12 +186,12 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
           await realAdb.openApp(app);
         } else if (cmd.type === "UNLOCK") {
           ultronAudio.playUnlock();
-          setDeviceToast("TRANSMITTED TO REDMI 13C 5G: UNLOCK SCREEN");
+          setDeviceToast("TRANSMITTED TO DEVICE: UNLOCK SCREEN");
           setTimeout(() => setDeviceToast(null), 4500);
           await realAdb.unlockPhone();
         } else if (cmd.type === "LOCK") {
           ultronAudio.playLock();
-          setDeviceToast("TRANSMITTED TO REDMI 13C 5G: LOCK SCREEN");
+          setDeviceToast("TRANSMITTED TO DEVICE: LOCK SCREEN");
           setTimeout(() => setDeviceToast(null), 4500);
           await realAdb.lockPhone();
         } else if (cmd.type === "ORB_MODE") {
@@ -223,7 +224,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         const data = await res.json();
         const reply = data.text || "Directive registered.";
 
-        // Execute actions on user's real Redmi 13C 5G
+        // Execute actions on user's real device
         if (data.commands) {
           executeHardwareCommands(data.commands);
         }
@@ -232,7 +233,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         speakDarkResponse(reply);
       } catch (err: any) {
         console.error("Dark core error:", err);
-        const fallbackReply = "Directive registered. Transmitting to your Redmi 13C 5G.";
+        const fallbackReply = "Directive registered. Transmitting to your device.";
         speakDarkResponse(fallbackReply);
       } finally {
         setIsLoading(false);
@@ -316,14 +317,14 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
     }, 3200);
   }, [speakDarkResponse]);
 
-  // Connect user's real Redmi 13C 5G via WebUSB
-  const handleConnectRedmi = useCallback(async () => {
+  // Connect user's real device via WebUSB
+  const handleConnectDevice = useCallback(async () => {
     const success = await realAdb.connect();
     if (success) {
       ultronAudio.playUnlock();
-      speakDarkResponse(`Redmi 13C 5G synchronized via ADB. Direct hardware control active.`);
+      speakDarkResponse(`Device synchronized via ADB. Direct hardware control active.`);
     } else if (realAdb.status.error) {
-      speakDarkResponse(`USB connection failed. Verify that USB Debugging is enabled on your Redmi 13C 5G.`);
+      speakDarkResponse(`USB connection failed. Verify that USB Debugging is enabled on your device.`);
     }
   }, [speakDarkResponse]);
 
@@ -433,14 +434,6 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         </div>
       </div>
 
-      {/* Secondary Holographic Panel: D3 Audio Spectrum Equalizer */}
-      <AudioHologramPanel
-        isListening={isListening}
-        isSpeaking={isSpeaking}
-        speechEnergy={speechEnergy}
-        onAudioLevel={(level) => sceneRef.current?.setAudioEnergy(level)}
-      />
-
       {/* Upper Center: Faded Speech Subtitle Banner (positioned safely below top HUD header) */}
       {currentSubtitle && (
         <div className="fixed top-20 md:top-24 left-1/2 -translate-x-1/2 z-30 max-w-md md:max-w-xl w-[86%] pointer-events-none opacity-80 hover:opacity-100 transition-all">
@@ -479,25 +472,22 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
           </button>
         )}
 
-        {/* Ambient Wi-Fi Device Status (Pure status telemetry, no connection buttons) */}
+        {/* Ambient Wi-Fi Device Status (Pure status telemetry, click to inspect link) */}
         <div
-          className={`px-3 py-1.5 text-xs rounded border transition flex items-center gap-2 select-none ${
+          onClick={() => setShowWifiCard((prev) => !prev)}
+          className={`px-3 py-1.5 text-xs rounded border transition flex items-center gap-2 select-none cursor-pointer ${
             isMobileLinked
-              ? "bg-emerald-950/40 border-emerald-400/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-              : "bg-black/30 border-sky-400/25 text-sky-400/70"
+              ? "bg-emerald-950/40 border-emerald-400/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-900/50"
+              : "bg-black/30 border-sky-400/25 text-sky-400/70 hover:border-sky-400/60"
           }`}
-          title={
-            isMobileLinked
-              ? "Redmi 13C 5G is connected and synchronized over Wi-Fi"
-              : "Wi-Fi link is active and listening for mobile devices on the network"
-          }
+          title="Click to view Wi-Fi link information"
         >
           <Radio
             size={13}
             className={isMobileLinked ? "text-emerald-400 animate-pulse" : "text-sky-400/50"}
           />
           <span className="hidden sm:inline font-mono tracking-wider">
-            {isMobileLinked ? "WI-FI: REDMI 13C 5G LINKED" : "WI-FI: AWAITING MOBILE NODE"}
+            {isMobileLinked ? "WI-FI: DEVICE LINKED" : "WI-FI: AWAITING DEVICE"}
           </span>
           <span
             className={`w-2 h-2 rounded-full ${
@@ -505,6 +495,55 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
             }`}
           />
         </div>
+
+        {/* Ambient Wi-Fi Info HUD Card */}
+        {showWifiCard && (
+          <div className="absolute top-12 right-0 z-50 w-72 bg-neutral-950/95 border border-sky-400/40 rounded-2xl shadow-[0_0_40px_rgba(56,189,248,0.25)] p-4 font-mono text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-sky-400/20 pb-2">
+              <div className="flex items-center gap-2 text-sky-300 font-bold tracking-wider text-[11px]">
+                <Radio size={14} className="text-sky-400 animate-pulse" />
+                <span>WI-FI DEVICE LINK</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowWifiCard(false);
+                }}
+                className="text-sky-400/60 hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="text-[11px] text-sky-200/80 leading-relaxed">
+              {isMobileLinked ? (
+                <span className="text-emerald-300 font-semibold">
+                  Device is connected over Wi-Fi 🟢. All voice directives are relayed across your network automatically.
+                </span>
+              ) : (
+                <span>
+                  Open this URL in Chrome on your device on the same Wi-Fi. It locks onto D.A.R.K. automatically:
+                </span>
+              )}
+            </div>
+
+            <div className="text-center py-2 bg-black/60 rounded-xl border border-sky-400/20">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
+                  typeof window !== "undefined" ? `${window.location.origin}/?mode=mobile` : ""
+                )}&color=38-189-248&bgcolor=10-15-30`}
+                alt="Scan to open on device"
+                className="w-28 h-28 mx-auto rounded-lg border border-sky-400/30 p-1"
+              />
+              <div className="text-[9px] text-sky-400/60 mt-1">SCAN WITH DEVICE CAMERA</div>
+            </div>
+
+            <div className="p-2 bg-sky-950/40 border border-sky-400/30 rounded-lg text-[10px] break-all select-all text-sky-300">
+              {typeof window !== "undefined" ? `${window.location.origin}/?mode=mobile` : ""}
+            </div>
+          </div>
+        )}
 
         <button
           type="button"

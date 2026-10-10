@@ -23,14 +23,14 @@ export function isMobileDevice(): boolean {
  * - On Laptop: dispatches command over the wireless bridge to the paired mobile phone.
  *   NEVER opens a tab or window on the laptop.
  */
-export function launchApp(appName: string): AppLaunchResult {
+export function launchApp(appName: string, forceMobile = false): AppLaunchResult {
   const name = (appName || "").toLowerCase().trim();
-  const onMobile = isMobileDevice();
+  const onMobile = forceMobile || isMobileDevice();
   const isAndroid =
     typeof navigator !== "undefined" &&
     (/Android/i.test(navigator.userAgent) || !/iPhone|iPad|Macintosh/i.test(navigator.userAgent));
 
-  // If this code is running on the LAPTOP:
+  // If this code is running on the LAPTOP (and not forcing mobile execution):
   // Forward exclusively to the mobile phone over the bridge. DO NOT open on laptop!
   if (!onMobile) {
     try {
@@ -54,16 +54,24 @@ export function launchApp(appName: string): AppLaunchResult {
       success: true,
       appName,
       method: "dispatched_to_mobile",
-      details: "Transmitted wirelessly to mobile device (Redmi 13C 5G).",
+      details: "Transmitted wirelessly to your device.",
     };
   }
 
-  // Helper to trigger link safely on mobile
-  const triggerMobileLink = (url: string) => {
+  return executeMobileLaunch(name, isAndroid);
+}
+
+/**
+ * Direct launch for mobile receiver without any bridge routing
+ */
+export function executeMobileLaunch(name: string, isAndroid = true): AppLaunchResult {
+  const triggerLink = (url: string) => {
     try {
       const a = document.createElement("a");
       a.href = url;
-      a.style.display = "none";
+      a.rel = "noopener noreferrer";
+      a.style.position = "fixed";
+      a.style.top = "-9999px";
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -74,24 +82,38 @@ export function launchApp(appName: string): AppLaunchResult {
     }
   };
 
-  // If running directly ON THE MOBILE PHONE:
-  // Trigger native Android Intents and deep links
   if (name.includes("youtube")) {
+    // 1. Android Intent URI format
     if (isAndroid) {
       const intentUrl =
-        "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;end";
-      triggerMobileLink(intentUrl);
+        "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end";
+      triggerLink(intentUrl);
+
+      // 2. Direct URI scheme fallback
       setTimeout(() => {
-        triggerMobileLink("vnd.youtube:");
-      }, 300);
+        triggerLink("vnd.youtube:");
+      }, 150);
+
+      // 3. Web URL fallback (Android App Links will capture youtube.com and launch YouTube app)
+      setTimeout(() => {
+        try {
+          window.location.assign("https://www.youtube.com");
+        } catch {
+          window.open("https://www.youtube.com", "_blank");
+        }
+      }, 400);
+
       return {
         success: true,
         appName: "YouTube",
         method: "android_intent",
-        details: "Launched YouTube native app on Redmi 13C 5G",
+        details: "Launched YouTube native app on device",
       };
     } else {
-      triggerMobileLink("vnd.youtube:");
+      triggerLink("vnd.youtube:");
+      setTimeout(() => {
+        window.location.href = "https://www.youtube.com";
+      }, 300);
     }
 
     return {
@@ -105,29 +127,28 @@ export function launchApp(appName: string): AppLaunchResult {
   if (name.includes("camera") || name.includes("photo")) {
     if (isAndroid) {
       try {
-        window.location.href = "intent:#Intent;action=android.media.action.STILL_IMAGE_CAMERA;end";
-        return {
-          success: true,
-          appName: "Camera",
-          method: "android_intent",
-          details: "Launched Camera intent on mobile",
-        };
+        triggerLink("intent:#Intent;action=android.media.action.STILL_IMAGE_CAMERA;end");
       } catch {
         // Fallback
       }
     }
 
-    // Trigger mobile camera
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = "image/*";
-    fileInput.setAttribute("capture", "environment");
-    fileInput.style.display = "none";
-    document.body.appendChild(fileInput);
-    fileInput.click();
-    setTimeout(() => {
-      document.body.removeChild(fileInput);
-    }, 1000);
+    // Trigger mobile camera capture
+    try {
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = "image/*";
+      fileInput.setAttribute("capture", "environment");
+      fileInput.style.position = "fixed";
+      fileInput.style.top = "-9999px";
+      document.body.appendChild(fileInput);
+      fileInput.click();
+      setTimeout(() => {
+        if (document.body.contains(fileInput)) document.body.removeChild(fileInput);
+      }, 1000);
+    } catch {
+      // Fallback
+    }
 
     return {
       success: true,
@@ -138,7 +159,10 @@ export function launchApp(appName: string): AppLaunchResult {
   }
 
   if (name.includes("whatsapp")) {
-    window.location.href = "whatsapp://send";
+    triggerLink("whatsapp://send");
+    setTimeout(() => {
+      window.location.href = "https://wa.me/";
+    }, 400);
     return {
       success: true,
       appName: "WhatsApp",
@@ -148,7 +172,10 @@ export function launchApp(appName: string): AppLaunchResult {
   }
 
   if (name.includes("spotify") || name.includes("music") || name.includes("song")) {
-    window.location.href = "spotify://";
+    triggerLink("spotify://");
+    setTimeout(() => {
+      window.location.href = "https://open.spotify.com";
+    }, 400);
     return {
       success: true,
       appName: "Spotify",
@@ -159,7 +186,7 @@ export function launchApp(appName: string): AppLaunchResult {
 
   if (name.includes("chrome") || name.includes("browser")) {
     if (isAndroid) {
-      window.location.href = "googlechrome://navigate?url=google.com";
+      triggerLink("googlechrome://navigate?url=google.com");
     } else {
       window.location.href = "https://www.google.com";
     }
@@ -172,11 +199,11 @@ export function launchApp(appName: string): AppLaunchResult {
   }
 
   // Fallback for other apps on mobile
-  window.location.href = `https://www.google.com/search?q=${encodeURIComponent(appName)}`;
+  window.location.href = `https://www.google.com/search?q=${encodeURIComponent(name)}`;
   return {
     success: true,
-    appName,
+    appName: name,
     method: "custom_scheme",
-    details: `Navigated to ${appName} on mobile`,
+    details: `Navigated to ${name} on mobile`,
   };
 }

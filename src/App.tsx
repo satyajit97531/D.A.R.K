@@ -20,7 +20,7 @@ export default function App() {
       } else if (modeParam === "orb") {
         setIsMobileMode(false);
       } else {
-        // Automatically detect if running on mobile device (e.g. Redmi 13C 5G)
+        // Automatically detect if running on mobile device
         setIsMobileMode(isMobileDevice());
       }
     }

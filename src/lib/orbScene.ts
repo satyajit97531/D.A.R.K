@@ -506,7 +506,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
   // ═══════════════════════════════════════════════
   const codeSnippets = [
     "D.A.R.K.", "SINGULARITY", "EVENT_HORIZON", "0x000000", "GARGANTUA",
-    "PHOTON_RING", "GRAVITY_WELL", "SCHWARZSCHILD", "VOID_CORE", "REDMI.LINK",
+    "PHOTON_RING", "GRAVITY_WELL", "SCHWARZSCHILD", "VOID_CORE", "DEVICE.LINK",
     "METRIC_TENSOR", "QUANTUM_FOAM", "ERGOSPHERE", "DARK_MATTER", "ENTROPY_0",
     "MASS: 4.2e6", "HAWKING_RAD", "GEODESIC", "C_VACUUM", "TIME_DILATE",
     "CHANDRA", "SPACETIME", "WARP_DRIVE", "HORIZON_LOCK", "ADB_DAEMON",

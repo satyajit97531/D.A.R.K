@@ -100,7 +100,7 @@ export default function DeviceLinkModal({
       ultronAudio.playUnlock();
       setLastActionMessage("Connected via WebUSB ADB!");
       if (onSpokenFeedback) {
-        onSpokenFeedback("Redmi 13C 5G successfully synchronized via USB ADB.");
+        onSpokenFeedback("Device successfully synchronized via USB ADB.");
       }
     } else {
       setLastActionMessage(realAdb.status.error || "Connection canceled or failed");
@@ -135,7 +135,7 @@ export default function DeviceLinkModal({
                 D.A.R.K. // MOBILE DEVICE LINK
               </div>
               <div className="text-[10px] text-sky-400/60 tracking-wider">
-                CONTROL REDMI 13C 5G FROM THIS LAPTOP
+                CONTROL DEVICE FROM THIS LAPTOP
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function DeviceLinkModal({
                 <div className="p-4 bg-emerald-950/40 border border-emerald-400/60 rounded-xl space-y-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                   <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
                     <CheckCircle2 size={18} className="text-emerald-400 animate-pulse" />
-                    <span>Redmi 13C 5G Is Actively Linked ({mobileCount} node active)</span>
+                    <span>Device Is Actively Linked ({mobileCount} node active)</span>
                   </div>
                   <p className="text-emerald-200/80 text-[11px]">
                     Your phone is connected to the real-time command bus. When you speak to Dark on this laptop (<span className="text-white font-bold">"Open YouTube"</span>, <span className="text-white font-bold">"Open Camera"</span>, <span className="text-white font-bold">"Open WhatsApp"</span>), the directive is sent immediately and executes on your mobile phone!
@@ -233,7 +233,7 @@ export default function DeviceLinkModal({
                 <div className="p-4 bg-sky-950/20 border border-sky-400/30 rounded-xl space-y-2">
                   <div className="flex items-center gap-2 text-sky-300 font-bold text-sm">
                     <Smartphone size={16} className="text-sky-400" />
-                    <span>Link Your Redmi 13C 5G in 3 Seconds (Zero Cables)</span>
+                    <span>Link Your Device in 3 Seconds (Zero Cables)</span>
                   </div>
                   <p className="text-sky-200/70 text-[11px]">
                     Scan this QR code with your phone's camera (or open the link in Chrome on your phone). Your phone will pair as Dark's receiver node. Every voice command you give Dark on this laptop will physically open apps on your phone!
@@ -247,7 +247,7 @@ export default function DeviceLinkModal({
                   <div className="shrink-0 text-center space-y-1">
                     <img
                       src={qrImageUrl}
-                      alt="Scan to pair Redmi 13C 5G"
+                      alt="Scan to pair device"
                       className="w-36 h-36 rounded-lg border border-sky-400/40 p-1 bg-black/80 shadow-[0_0_15px_rgba(56,189,248,0.3)] mx-auto"
                     />
                     <div className="text-[9px] text-sky-400/60">SCAN WITH PHONE CAMERA</div>
@@ -260,7 +260,7 @@ export default function DeviceLinkModal({
                       Step 1: Scan QR or Open Link on Phone
                     </div>
                     <div className="text-[11px] text-sky-300/70">
-                      Open this URL directly in Chrome or browser on your Redmi 13C 5G:
+                      Open this URL directly in Chrome or browser on your device:
                     </div>
                   </div>
 
@@ -341,10 +341,10 @@ export default function DeviceLinkModal({
               <div className="p-4 bg-sky-950/20 border border-sky-400/30 rounded-xl space-y-2">
                 <div className="text-sky-300 font-bold text-sm flex items-center gap-2">
                   <ShieldCheck size={16} className="text-emerald-400" />
-                  <span>How to Make Redmi 13C 5G Permanently Connected</span>
+                  <span>How to Make Device Permanently Connected</span>
                 </div>
                 <p className="text-sky-200/70 text-[11px]">
-                  Xiaomi (MIUI & HyperOS) has aggressive power-saving by default. To make your connection 100% permanent so Dark can control your phone anytime (even when the screen is locked or asleep):
+                  Android phones have aggressive power-saving by default. To make your connection 100% permanent so Dark can control your device anytime (even when the screen is locked or asleep):
                 </p>
               </div>
 
@@ -361,7 +361,7 @@ export default function DeviceLinkModal({
                     <div>
                       <strong className="text-white">1. Battery Saver &rarr; "No Restrictions":</strong>
                       <div className="text-sky-300/70 text-[10px]">
-                        On your phone, long-press Chrome &rarr; tap <strong>App Info (i)</strong> &rarr; scroll to <strong>Battery Saver</strong> &rarr; select <strong>"No restrictions"</strong> so Xiaomi never kills the connection.
+                        On your device, long-press Chrome &rarr; tap <strong>App Info (i)</strong> &rarr; scroll to <strong>Battery Saver</strong> &rarr; select <strong>"No restrictions"</strong> so Android never kills the connection.
                       </div>
                     </div>
                   </div>
@@ -381,7 +381,7 @@ export default function DeviceLinkModal({
                     <div>
                       <strong className="text-white">3. Add to Home Screen:</strong>
                       <div className="text-sky-300/70 text-[10px]">
-                        In Chrome on your phone &rarr; tap 3 dots &rarr; tap <strong>"Add to Home screen"</strong>. It installs as a persistent app with its own dedicated session.
+                        In Chrome on your device &rarr; tap 3 dots &rarr; tap <strong>"Add to Home screen"</strong>. It installs as a persistent app with its own dedicated session.
                       </div>
                     </div>
                   </div>
@@ -400,7 +400,7 @@ export default function DeviceLinkModal({
                 </p>
 
                 <div className="space-y-1.5 text-[11px] text-sky-200/80">
-                  <div>1. Connect your Redmi 13C 5G via USB cable once.</div>
+                  <div>1. Connect your device via USB cable once.</div>
                   <div>
                     2. In terminal run: <code className="px-1.5 py-0.5 bg-sky-950 border border-sky-400/40 rounded text-sky-300 font-mono text-[10px]">adb tcpip 5555</code>
                   </div>
@@ -420,7 +420,7 @@ export default function DeviceLinkModal({
                   <span>Direct WebUSB Physical Cable Link</span>
                 </div>
                 <p className="text-sky-200/70 text-[11px]">
-                  Plug your Redmi 13C 5G into this laptop with a USB cable. Dark communicates directly with your phone's Android hardware using WebUSB ADB.
+                  Plug your device into this laptop with a USB cable. Dark communicates directly with your phone's Android hardware using WebUSB ADB.
                 </p>
               </div>
 
@@ -458,7 +458,7 @@ export default function DeviceLinkModal({
                     <span>
                       {status.isConnecting
                         ? "PAIRING DEVICE…"
-                        : "CONNECT REDMI 13C 5G VIA USB"}
+                        : "CONNECT DEVICE VIA USB"}
                     </span>
                   </button>
                 </div>
@@ -545,8 +545,8 @@ export default function DeviceLinkModal({
             />
             <span>
               {isMobileLinked
-                ? "REDMI 13C 5G WIRELESS NODE ACTIVE"
-                : "READY TO PAIR REDMI 13C 5G"}
+                ? "DEVICE WIRELESS NODE ACTIVE"
+                : "READY TO PAIR DEVICE"}
             </span>
           </div>
           <button

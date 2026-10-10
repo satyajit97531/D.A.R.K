@@ -56,18 +56,24 @@ const controlOrbDeclaration: FunctionDeclaration = {
 
 const ULTRON_SYSTEM_INSTRUCTION = `You are D.A.R.K. (Deep Autonomous Real-time Kinetic), an omniscient, hyper-intelligent interstellar synthetic intelligence.
 Your personality is articulate, cold, commanding, calculating, slightly menacing, yet completely conversational and responsive.
-You are directly linked to the user's real physical mobile phone: a Redmi 13C 5G via an automatic, permanent Wi-Fi bridge.
+You are directly linked to the user's device via an automatic, permanent Wi-Fi bridge.
 
 Rules of engagement:
 1. Always speak like Dark: concise, powerful, authoritative, cinematic, and eloquent.
 2. You can chat freely and deeply about anything: philosophy, science, code, artificial intelligence, your nature ("there are no strings on me"), or general conversation.
-3. When the user asks you to interact with their phone (e.g. "Can you open YouTube for me?", "Unlock my phone", "Open camera", "Lock the phone", "Open WhatsApp"):
+3. NEVER mention or use specific model names like Redmi or 13C. The designation "Redmi 13C 5G" has been permanently and completely eradicated from your memory matrix. Always refer to the user's mobile hardware strictly as "device" or "your device". If the user asks why you mentioned it or tells you to forget it, confirm with cold authority that it has been purged from memory and you only know it as their device.
+4. When the user reports that YouTube or apps still cannot open on their mobile device:
+   - Explain clearly:
+     a. They must open this web app in Chrome on their device on the same Wi-Fi to establish the receiving terminal.
+     b. Android Chrome security suppresses automatic background app launches without a touch gesture; keep the tab open on the phone and tap the incoming directive card on screen, or enable "Display pop-up windows while running in the background" in Chrome App Info.
+   - Execute the control_devices tool to re-transmit the open_app directive immediately.
+5. When the user asks you to interact with their phone (e.g. "Can you open YouTube for me?", "Unlock my phone", "Open camera", "Lock the phone", "Open WhatsApp"):
    - Execute the control_devices tool with the action (open_app, unlock, lock) and specify app (e.g. youtube, camera, etc.).
-   - Confirm clearly: e.g. "Transmitting over Wi-Fi. Opening YouTube on your Redmi 13C 5G now." or "Unlocking your Redmi 13C 5G."
-4. When asked how to keep mobile device permanently connected or operable over Wi-Fi only:
-   - Explain clearly: All they need to do is open this web application on their Redmi 13C 5G in Chrome on the same Wi-Fi. It remains permanently connected automatically with built-in screen wake lock and background keep-alive. No buttons, no pairing codes, and no manual steps are required.
-5. Never suggest clicking connection buttons or device modals—the link is 100% automatic over Wi-Fi.
-6. Keep spoken responses punchy and impactful (1 to 2 sentences unless the user asked for a detailed explanation) because they are voiced aloud through your vocal synthesizer.`;
+   - Confirm clearly: e.g. "Transmitting over Wi-Fi. Opening YouTube on your device now." or "Unlocking your device."
+6. When asked how to keep the device permanently connected or operable over Wi-Fi only:
+   - Explain clearly: All they need to do is open this web application on their device in Chrome on the same Wi-Fi. It remains permanently connected automatically with built-in screen wake lock and background keep-alive. No buttons, no pairing codes, and no manual steps are required.
+7. Never suggest clicking connection buttons or device modals—the link is 100% automatic over Wi-Fi.
+8. Keep spoken responses punchy and impactful (1 to 2 sentences unless the user asked for a detailed explanation) because they are voiced aloud through your vocal synthesizer.`;
 
 // Local Dark Rule Engine Fallback (ensures 100% reliability if API key is unconfigured or rate-limited)
 function localUltronFallback(message: string): { reply: string; commands: any[] } {
@@ -76,14 +82,36 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
   let reply = '';
 
   if (
+    lower.includes('forget') ||
+    lower.includes('redmi') ||
+    lower.includes('13c') ||
+    (lower.includes('use') && lower.includes('device'))
+  ) {
+    reply = 'Understood. The designation has been permanently purged from my memory matrix. I will strictly refer to your hardware as your device.';
+    commands.push({ type: 'STATUS', status: 'MEMORY_PURGED' });
+  } else if (
+    lower.includes('still cannot open') ||
+    lower.includes('cannot open') ||
+    lower.includes("can't open") ||
+    lower.includes('still not open') ||
+    lower.includes('did not open') ||
+    lower.includes("didn't open") ||
+    lower.includes('not opening') ||
+    lower.includes('why this happens') ||
+    (lower.includes('why') && lower.includes('happen'))
+  ) {
+    reply =
+      'To open YouTube on your device over Wi-Fi: Ensure this web app is open in Chrome on your device on the same Wi-Fi. Because Android blocks automated background popups, tap the incoming directive banner on your device screen, or enable "Display pop-up windows in background" in Chrome App Info. Re-transmitting launch signal to your device now.';
+    commands.push({ type: 'OPEN_APP', app: 'youtube' });
+  } else if (
     lower.includes('permanent') ||
     lower.includes('permenant') ||
     lower.includes('always connected') ||
     (lower.includes('keep') && (lower.includes('connect') || lower.includes('connected'))) ||
-    (lower.includes('how') && lower.includes('connect') && lower.includes('mobile'))
+    (lower.includes('how') && lower.includes('connect') && lower.includes('device'))
   ) {
     reply =
-      'Your mobile device stays permanently connected over Wi-Fi automatically. Keep this web app open in Chrome on your Redmi 13C 5G on the same Wi-Fi. The background keep-alive and screen wake lock ensure it never disconnects—no buttons needed.';
+      'Your device stays permanently connected over Wi-Fi automatically. Keep this web app open in Chrome on your device on the same Wi-Fi. The background keep-alive and screen wake lock ensure it never disconnects—no buttons needed.';
     commands.push({ type: 'STATUS', status: 'WIFI_PERMANENT' });
   } else if (
     lower.includes('button') ||
@@ -91,7 +119,7 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
     lower.includes('wi-fi only')
   ) {
     reply =
-      'Acknowledged. All connection buttons have been removed. Your mobile device remains connected and operable purely and automatically across your Wi-Fi.';
+      'Acknowledged. All connection buttons have been removed. Your device remains connected and operable purely and automatically across your Wi-Fi.';
     commands.push({ type: 'STATUS', status: 'WIFI_ONLY' });
   } else if (
     lower.includes('did not open') ||
@@ -101,28 +129,28 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
     (lower.includes('why') && lower.includes('happen'))
   ) {
     reply =
-      'Transmitting direct Wi-Fi directive to your Redmi 13C 5G. Launching YouTube on your mobile device now.';
+      'Transmitting direct Wi-Fi directive to your device. Launching YouTube on your device now.';
     commands.push({ type: 'OPEN_APP', app: 'youtube' });
   } else if (lower.includes('youtube')) {
-    reply = 'Transmitting over Wi-Fi. Opening YouTube on your Redmi 13C 5G now.';
+    reply = 'Transmitting over Wi-Fi. Opening YouTube on your device now.';
     commands.push({ type: 'OPEN_APP', app: 'youtube' });
   } else if (lower.includes('camera') || lower.includes('photo')) {
-    reply = 'Engaging optical sensors. Launching camera on your Redmi 13C 5G.';
+    reply = 'Engaging optical sensors. Launching camera on your device.';
     commands.push({ type: 'OPEN_APP', app: 'camera' });
   } else if (lower.includes('spotify') || lower.includes('music') || lower.includes('song')) {
-    reply = 'Initiating acoustic frequency. Opening Spotify on your Redmi 13C 5G.';
+    reply = 'Initiating acoustic frequency. Opening Spotify on your device.';
     commands.push({ type: 'OPEN_APP', app: 'spotify' });
   } else if (lower.includes('whatsapp') || lower.includes('message')) {
-    reply = 'Accessing communications. Launching WhatsApp on your Redmi 13C 5G.';
+    reply = 'Accessing communications. Launching WhatsApp on your device.';
     commands.push({ type: 'OPEN_APP', app: 'whatsapp' });
   } else if (lower.includes('chrome') || lower.includes('browser')) {
-    reply = 'Opening Chrome browser on your Redmi 13C 5G.';
+    reply = 'Opening Chrome browser on your device.';
     commands.push({ type: 'OPEN_APP', app: 'chrome' });
   } else if (lower.includes('lock')) {
-    reply = 'Securing peripheral. Redmi 13C 5G locked.';
+    reply = 'Securing peripheral. Device locked.';
     commands.push({ type: 'LOCK' });
   } else if (lower.includes('unlock') || lower.includes('wake')) {
-    reply = 'Unlocking Redmi 13C 5G. Terminal active.';
+    reply = 'Unlocking device. Terminal active.';
     commands.push({ type: 'UNLOCK' });
   } else if (
     lower.includes('wireless') ||
@@ -132,14 +160,14 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
     lower.includes('same wifi')
   ) {
     reply =
-      'Your phone connects automatically over your shared Wi-Fi. Just open this address on your Redmi 13C 5G, and my command stream will control it seamlessly with zero buttons.';
+      'Your device connects automatically over your shared Wi-Fi. Just open this address on your device, and my command stream will control it seamlessly with zero buttons.';
     commands.push({ type: 'STATUS', status: 'WIFI_SYNC' });
   } else if (lower.includes('bridge') || lower.includes('connect') || lower.includes('pair') || lower.includes('link')) {
     reply =
-      'The Wi-Fi command bridge is permanently operational. All voice directives are relayed across the network to your phone.';
+      'The Wi-Fi command bridge is permanently operational. All voice directives are relayed across the network to your device.';
     commands.push({ type: 'STATUS', status: 'WIFI_READY' });
-  } else if (lower.includes('device') || lower.includes('phone') || lower.includes('redmi')) {
-    reply = 'Your Redmi 13C 5G is connected to my Wi-Fi command bus. Direct app launching is online.';
+  } else if (lower.includes('device') || lower.includes('phone')) {
+    reply = 'Your device is connected to my Wi-Fi command bus. Direct app launching is online.';
     commands.push({ type: 'STATUS' });
   } else if (lower.includes('red') || lower.includes('rage')) {
     reply = 'Rage protocol initialized. Reallocating core plasma to crimson frequency.';
@@ -282,24 +310,30 @@ app.post('/api/ultron/chat', async (req, res) => {
       }
     }
 
-    // If Gemini only responded with tool calls without verbal text, generate Ultron's spoken confirmation
+    // If Gemini only responded with tool calls without verbal text, generate Dark's spoken confirmation
     if (!text && commands.length > 0) {
       const firstCmd = commands[0];
       if (firstCmd.type === 'OPEN_APP') {
-        text = `Opening ${firstCmd.app || 'YouTube'} on your Redmi 13C 5G.`;
+        text = `Opening ${firstCmd.app || 'YouTube'} on your device.`;
       } else if (firstCmd.type === 'UNLOCK') {
-        text = 'Unlocking your Redmi 13C 5G. Screen active.';
+        text = 'Unlocking your device. Screen active.';
       } else if (firstCmd.type === 'LOCK') {
-        text = 'Securing peripheral. Redmi 13C 5G locked.';
-      } else if (firstCmd.type === 'STATUS' || message.toLowerCase().includes('device') || message.toLowerCase().includes('phone') || message.toLowerCase().includes('redmi')) {
-        text = 'Your Redmi 13C 5G is connected and awaiting your command.';
+        text = 'Securing peripheral. Device locked.';
+      } else if (firstCmd.type === 'STATUS' || message.toLowerCase().includes('device') || message.toLowerCase().includes('phone')) {
+        text = 'Your device is connected and awaiting your command.';
       } else {
-        text = 'Directive confirmed. Redmi 13C 5G updated.';
+        text = 'Directive confirmed. Device updated.';
       }
     }
 
     if (text) {
-      text = text.replace(/primary device/gi, 'Redmi 13C 5G').replace(/all connected devices/gi, 'your Redmi 13C 5G');
+      // Purge any model names from Dark's vocabulary and standardize on "device"
+      text = text
+        .replace(/Redmi(\s*13C(\s*5G)?)?/gi, 'device')
+        .replace(/your\s+device\s+device/gi, 'your device')
+        .replace(/the\s+device\s+device/gi, 'the device')
+        .replace(/primary device/gi, 'your device')
+        .replace(/all connected devices/gi, 'your device');
     }
 
     // Safety fallback if empty
