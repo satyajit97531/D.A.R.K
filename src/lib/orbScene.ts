@@ -6,6 +6,13 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 
+export interface GestureState {
+  active: boolean;
+  mode: "idle" | "spin" | "zoom";
+  hands?: number;
+  intensity?: number;
+}
+
 export interface OrbSceneApi {
   /** Rotate the camera around the orb by the given angles (radians). */
   rotateBy(deltaTheta: number, deltaPhi: number): void;
@@ -16,6 +23,7 @@ export interface OrbSceneApi {
   resetView(): void;
   setAudioEnergy(level: number): void;
   setTheme(theme: "amber" | "crimson_red" | "cyan"): void;
+  setGestureState?(state: GestureState): void;
   dispose(): void;
 }
 
@@ -126,14 +134,27 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
   scene.add(orbGroup);
 
   // ——— MATERIAL HELPERS ———
-  function lineMat(color: number, opacity = 1) {
-    return new THREE.LineBasicMaterial({
+  interface SurfaceLineEntry {
+    material: THREE.LineBasicMaterial;
+    accent: number;
+  }
+  const surfaceLines: SurfaceLineEntry[] = [];
+
+  function lineMat(color: number, opacity = 1, isSurface = false, accent = 1) {
+    const mat = new THREE.LineBasicMaterial({
       color,
       transparent: true,
       opacity,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
+    if (isSurface) {
+      surfaceLines.push({
+        material: mat,
+        accent,
+      });
+    }
+    return mat;
   }
 
   // ——— UTILITY: Create ring at latitude ———
@@ -175,7 +196,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     const lat = (i / 15) * (Math.PI / 2) * 0.95;
     const opacity = i % 3 === 0 ? 0.5 : 0.12;
     const color = i % 3 === 0 ? C_MID : C_FAINT;
-    outerShell.add(new THREE.Line(latRing(R1, lat), lineMat(color, opacity)));
+    outerShell.add(new THREE.Line(latRing(R1, lat), lineMat(color, opacity, true, i % 3 === 0 ? 1.5 : 0.8)));
   }
 
   // Dense meridians (24)
@@ -185,7 +206,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     outerShell.add(
       new THREE.Line(
         meridian(R1, lon),
-        lineMat(isMajor ? C_MID : C_FAINT, isMajor ? 0.6 : 0.1),
+        lineMat(isMajor ? C_MID : C_FAINT, isMajor ? 0.6 : 0.1, true, isMajor ? 2.0 : 0.7),
       ),
     );
   }
@@ -202,7 +223,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
       const opacity = 0.85 * falloff;
       const color = Math.abs(t) < 0.3 ? C_BRIGHT : C_MID;
       outerShell.add(
-        new THREE.Line(meridian(R1, lon + offset, 200), lineMat(color, opacity)),
+        new THREE.Line(meridian(R1, lon + offset, 200), lineMat(color, opacity, true, 2.5)),
       );
     }
   }
@@ -217,7 +238,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     const opacity = 0.8 * falloff;
     const color = Math.abs(t) < 0.3 ? C_BRIGHT : C_MID;
     outerShell.add(
-      new THREE.Line(latRing(R1, offset, 200), lineMat(color, opacity)),
+      new THREE.Line(latRing(R1, offset, 200), lineMat(color, opacity, true, 2.5)),
     );
   }
 
@@ -792,12 +813,18 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
   let disposed = false;
   let currentAudioEnergy = 0;
   let targetAudioEnergy = 0;
+  let currentTheme: "amber" | "crimson_red" | "cyan" = "cyan";
 
   function setAudioEnergy(level: number) {
     targetAudioEnergy = Math.max(0, Math.min(1.5, level));
   }
 
+  function setGestureState(_state: GestureState) {
+    // MediaPipe gesture pulsation/color-shifting removed per user request
+  }
+
   function setTheme(theme: "amber" | "crimson_red" | "cyan") {
+    currentTheme = theme;
     if (theme === "crimson_red") {
       colorTintUniform.value.set(1.5, 0.25, 0.45); // Dark Cosmic Crimson
       accretionRings.forEach((r, idx) => {
@@ -808,6 +835,9 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
       });
       photonRingMat.color.setHex(0xff3366);
       icoWireMat.color.setHex(0xff2255);
+      surfaceLines.forEach((item) => {
+        item.material.color.setHex(item.accent > 1.8 ? 0xff3366 : item.accent > 1.0 ? 0x990033 : 0x44001a);
+      });
     } else {
       colorTintUniform.value.set(0.65, 0.85, 1.35); // Deep Interstellar Cyan/Violet
       accretionRings.forEach((r, idx) => {
@@ -818,6 +848,9 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
       });
       photonRingMat.color.setHex(C_PHOTON);
       icoWireMat.color.setHex(C_HOT);
+      surfaceLines.forEach((item) => {
+        item.material.color.setHex(item.accent > 1.8 ? C_BRIGHT : item.accent > 1.0 ? C_MID : C_FAINT);
+      });
     }
   }
 
@@ -846,10 +879,11 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     // Zero-g micro levitation float
     orbGroup.position.y = Math.sin(t * 0.85) * 0.025;
 
-    // Layered breathing propagation across holographic shells
+    // Layered breathing across holographic shells
     const outerBreath = Math.sin(breathPhase - 0.45) * 0.022;
-    outerShell.scale.setScalar(1 + outerBreath + currentAudioEnergy * 0.08);
-    panelGroup.scale.setScalar(1 + outerBreath * 1.05 + currentAudioEnergy * 0.08);
+    const surfaceScale = 1 + outerBreath + currentAudioEnergy * 0.08;
+    outerShell.scale.setScalar(surfaceScale);
+    panelGroup.scale.setScalar(surfaceScale);
     shell2.scale.setScalar(1 + Math.sin(breathPhase - 0.3) * 0.025 + currentAudioEnergy * 0.06);
 
     // Inner Core lattice breathing
@@ -971,10 +1005,11 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     }
 
     // Bloom pulse
-    bloom.strength = 1.6 + Math.sin(t * 0.8) * 0.3;
+    bloom.strength = 1.6 + Math.sin(t * 0.8) * 0.3 + currentAudioEnergy * 0.4;
 
     // Update chromatic aberration time
     chromaticPass.uniforms.uTime.value = t;
+    chromaticPass.uniforms.uIntensity.value = 0.003;
 
     controls.update();
     composer.render();
@@ -1024,6 +1059,7 @@ export function createOrbScene(container: HTMLElement): OrbSceneApi {
     resetView,
     setAudioEnergy,
     setTheme,
+    setGestureState,
     dispose,
   };
 }

@@ -345,9 +345,15 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
     setError(null);
 
     const tracker = new HandTracker(video, overlay, {
-      onRotate: (dt, dp) => sceneRef.current?.rotateBy(dt, dp),
-      onZoom: (factor) => sceneRef.current?.zoomBy(factor),
-      onStatus: setStatus,
+      onRotate: (dt, dp) => {
+        sceneRef.current?.rotateBy(dt, dp);
+      },
+      onZoom: (factor) => {
+        sceneRef.current?.zoomBy(factor);
+      },
+      onStatus: (st) => {
+        setStatus(st);
+      },
     });
     trackerRef.current = tracker;
 

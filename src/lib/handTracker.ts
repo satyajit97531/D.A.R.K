@@ -31,12 +31,21 @@ export interface TrackerStatus {
   mode: GestureMode;
 }
 
+export interface GestureEvent {
+  hands: number;
+  mode: GestureMode;
+  active: boolean;
+  pinching: boolean;
+}
+
 export interface HandTrackerCallbacks {
   /** Called when a single pinched hand drags: deltas in mirrored normalized coords. */
   onRotate(deltaTheta: number, deltaPhi: number): void;
   /** Called when both hands pinch and spread/close: multiply camera distance by factor. */
   onZoom(factor: number): void;
   onStatus(status: TrackerStatus): void;
+  /** Continuous per-frame gesture state for real-time visual reactions */
+  onGesture?(event: GestureEvent): void;
 }
 
 interface Point {
@@ -122,6 +131,12 @@ export class HandTracker {
     const ctx = this.overlay.getContext("2d");
     ctx?.clearRect(0, 0, this.overlay.width, this.overlay.height);
     this.emitStatus({ hands: 0, mode: "idle" });
+    this.callbacks.onGesture?.({
+      hands: 0,
+      mode: "idle",
+      active: false,
+      pinching: false,
+    });
   }
 
   private loop = () => {
@@ -215,6 +230,12 @@ export class HandTracker {
     }
 
     this.emitStatus({ hands: landmarks.length, mode });
+    this.callbacks.onGesture?.({
+      hands: landmarks.length,
+      mode,
+      active: mode !== "idle" || landmarks.length > 0,
+      pinching: pinchedGrabs.length > 0,
+    });
   }
 
   private emitStatus(status: TrackerStatus): void {
