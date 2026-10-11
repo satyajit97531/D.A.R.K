@@ -83,25 +83,29 @@ export function executeMobileLaunch(name: string, isAndroid = true): AppLaunchRe
   };
 
   if (name.includes("youtube")) {
-    // 1. Android Intent URI format
+    // 1. Direct URI scheme (fastest native trigger on Android & iOS)
+    try {
+      window.location.href = "vnd.youtube:";
+    } catch {
+      triggerLink("vnd.youtube:");
+    }
+
+    // 2. Android Intent URI format
     if (isAndroid) {
-      const intentUrl =
-        "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end";
-      triggerLink(intentUrl);
-
-      // 2. Direct URI scheme fallback
       setTimeout(() => {
-        triggerLink("vnd.youtube:");
-      }, 150);
+        const intentUrl =
+          "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end";
+        triggerLink(intentUrl);
+      }, 120);
 
-      // 3. Web URL fallback (Android App Links will capture youtube.com and launch YouTube app)
+      // 3. Web URL fallback (Android App Links captures youtube.com and launches YouTube app)
       setTimeout(() => {
         try {
           window.location.assign("https://www.youtube.com");
         } catch {
           window.open("https://www.youtube.com", "_blank");
         }
-      }, 400);
+      }, 500);
 
       return {
         success: true,
@@ -110,7 +114,6 @@ export function executeMobileLaunch(name: string, isAndroid = true): AppLaunchRe
         details: "Launched YouTube native app on device",
       };
     } else {
-      triggerLink("vnd.youtube:");
       setTimeout(() => {
         window.location.href = "https://www.youtube.com";
       }, 300);

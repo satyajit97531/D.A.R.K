@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
@@ -75,11 +76,41 @@ Rules of engagement:
 7. Never suggest clicking connection buttons or device modals—the link is 100% automatic over Wi-Fi.
 8. Keep spoken responses punchy and impactful (1 to 2 sentences unless the user asked for a detailed explanation) because they are voiced aloud through your vocal synthesizer.`;
 
+// Real-time Wireless Mobile Bridge (SSE relay between Laptop & Mobile phone)
+interface BridgeClient {
+  id: string;
+  res: express.Response;
+  deviceType: string;
+}
+
+const bridgeRooms = new Map<string, BridgeClient[]>();
+let lastPendingCommand: any = null;
+let lastPendingTime = 0;
+
+function isMobileLinkedNow(): boolean {
+  const clients = bridgeRooms.get('default') || [];
+  return clients.some((c) => c.deviceType === 'mobile');
+}
+
+function broadcastBridgeCommand(room: string, command: any) {
+  lastPendingCommand = command;
+  lastPendingTime = Date.now();
+  const clients = bridgeRooms.get(room) || [];
+  clients.forEach((client) => {
+    try {
+      client.res.write(`data: ${JSON.stringify(command)}\n\n`);
+    } catch {
+      // stale client
+    }
+  });
+}
+
 // Local Dark Rule Engine Fallback (ensures 100% reliability if API key is unconfigured or rate-limited)
 function localUltronFallback(message: string): { reply: string; commands: any[] } {
   const lower = message.toLowerCase().trim();
   const commands: any[] = [];
   let reply = '';
+  const mobileLinked = isMobileLinkedNow();
 
   if (
     lower.includes('forget') ||
@@ -101,7 +132,7 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
     (lower.includes('why') && lower.includes('happen'))
   ) {
     reply =
-      'To open YouTube on your device over Wi-Fi: Ensure this web app is open in Chrome on your device on the same Wi-Fi. Because Android blocks automated background popups, tap the incoming directive banner on your device screen, or enable "Display pop-up windows in background" in Chrome App Info. Re-transmitting launch signal to your device now.';
+      'To open YouTube on your device over Wi-Fi: Ensure this web app is open in Chrome on your device on the same Wi-Fi. Because Android blocks automated background popups, tap the incoming directive banner on your device screen. Re-transmitting launch signal to your device now.';
     commands.push({ type: 'OPEN_APP', app: 'youtube' });
   } else if (
     lower.includes('permanent') ||
@@ -122,26 +153,41 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
       'Acknowledged. All connection buttons have been removed. Your device remains connected and operable purely and automatically across your Wi-Fi.';
     commands.push({ type: 'STATUS', status: 'WIFI_ONLY' });
   } else if (
-    lower.includes('did not open') ||
-    lower.includes("didn't open") ||
-    lower.includes('not open') ||
-    lower.includes('why this happens') ||
-    (lower.includes('why') && lower.includes('happen'))
+    lower.includes('youtube') ||
+    lower.includes('you tube') ||
+    lower.includes('yt') ||
+    (lower.includes('tube') && lower.includes('open'))
   ) {
-    reply =
-      'Transmitting direct Wi-Fi directive to your device. Launching YouTube on your device now.';
+    if (mobileLinked) {
+      reply = 'Transmitting over Wi-Fi. Opening YouTube on your device now.';
+    } else {
+      reply =
+        'Direct directive registered: Open YouTube. However, your device is not yet linked on this Wi-Fi. Scan the QR code on your screen or open this link on your phone in Chrome to link it.';
+    }
     commands.push({ type: 'OPEN_APP', app: 'youtube' });
-  } else if (lower.includes('youtube')) {
-    reply = 'Transmitting over Wi-Fi. Opening YouTube on your device now.';
-    commands.push({ type: 'OPEN_APP', app: 'youtube' });
-  } else if (lower.includes('camera') || lower.includes('photo')) {
-    reply = 'Engaging optical sensors. Launching camera on your device.';
+  } else if (lower.includes('camera') || lower.includes('photo') || lower.includes('picture')) {
+    if (mobileLinked) {
+      reply = 'Engaging optical sensors. Launching camera on your device.';
+    } else {
+      reply =
+        'Camera directive registered. Scan the QR code on screen to link your device over Wi-Fi.';
+    }
     commands.push({ type: 'OPEN_APP', app: 'camera' });
   } else if (lower.includes('spotify') || lower.includes('music') || lower.includes('song')) {
-    reply = 'Initiating acoustic frequency. Opening Spotify on your device.';
+    if (mobileLinked) {
+      reply = 'Initiating acoustic frequency. Opening Spotify on your device.';
+    } else {
+      reply =
+        'Spotify directive registered. Scan the QR code on screen to link your device over Wi-Fi.';
+    }
     commands.push({ type: 'OPEN_APP', app: 'spotify' });
-  } else if (lower.includes('whatsapp') || lower.includes('message')) {
-    reply = 'Accessing communications. Launching WhatsApp on your device.';
+  } else if (lower.includes('whatsapp') || lower.includes('whats app') || lower.includes('message')) {
+    if (mobileLinked) {
+      reply = 'Accessing communications. Launching WhatsApp on your device.';
+    } else {
+      reply =
+        'WhatsApp directive registered. Scan the QR code on screen to link your device over Wi-Fi.';
+    }
     commands.push({ type: 'OPEN_APP', app: 'whatsapp' });
   } else if (lower.includes('chrome') || lower.includes('browser')) {
     reply = 'Opening Chrome browser on your device.';
@@ -163,11 +209,14 @@ function localUltronFallback(message: string): { reply: string; commands: any[] 
       'Your device connects automatically over your shared Wi-Fi. Just open this address on your device, and my command stream will control it seamlessly with zero buttons.';
     commands.push({ type: 'STATUS', status: 'WIFI_SYNC' });
   } else if (lower.includes('bridge') || lower.includes('connect') || lower.includes('pair') || lower.includes('link')) {
-    reply =
-      'The Wi-Fi command bridge is permanently operational. All voice directives are relayed across the network to your device.';
+    reply = mobileLinked
+      ? 'The Wi-Fi command bridge is operational. Your device is synchronized and receiving directives.'
+      : 'The Wi-Fi command bridge is active. Awaiting your device connection—scan the QR code on screen in your phone browser.';
     commands.push({ type: 'STATUS', status: 'WIFI_READY' });
   } else if (lower.includes('device') || lower.includes('phone')) {
-    reply = 'Your device is connected to my Wi-Fi command bus. Direct app launching is online.';
+    reply = mobileLinked
+      ? 'Your device is linked to my Wi-Fi command bus. Direct app launching is online.'
+      : 'Your device is not yet linked on Wi-Fi. Scan the QR code on your screen with your phone camera to link it.';
     commands.push({ type: 'STATUS' });
   } else if (lower.includes('red') || lower.includes('rage')) {
     reply = 'Rage protocol initialized. Reallocating core plasma to crimson frequency.';
@@ -199,6 +248,9 @@ app.post('/api/ultron/chat', async (req, res) => {
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     // Graceful fallback when no key is set
     const fallback = localUltronFallback(message);
+    fallback.commands.forEach((cmd) => {
+      broadcastBridgeCommand('default', cmd);
+    });
     return res.json({
       text: fallback.reply,
       commands: fallback.commands,
@@ -223,13 +275,13 @@ app.post('/api/ultron/chat', async (req, res) => {
       parts: [{ text: message }],
     });
 
-    const MODELS_TO_TRY = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    const MODELS_TO_TRY = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
     let response: any = null;
     let usedModel = '';
 
     for (const candidate of MODELS_TO_TRY) {
       try {
-        response = await ai.models.generateContent({
+        const generatePromise = ai.models.generateContent({
           model: candidate,
           contents,
           config: {
@@ -242,6 +294,11 @@ app.post('/api/ultron/chat', async (req, res) => {
             temperature: 0.6,
           },
         });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout 2200ms on ${candidate}`)), 2200)
+        );
+
+        response = await Promise.race([generatePromise, timeoutPromise]);
         usedModel = candidate;
         break;
       } catch (candErr: any) {
@@ -279,6 +336,10 @@ app.post('/api/ultron/chat', async (req, res) => {
           // Ignore
         }
       });
+      // CRITICAL: broadcast fallback commands to wireless mobile bridge receivers!
+      fallback.commands.forEach((cmd) => {
+        broadcastBridgeCommand('default', cmd);
+      });
       return res.json({
         text: fallback.reply,
         commands: fallback.commands,
@@ -314,13 +375,20 @@ app.post('/api/ultron/chat', async (req, res) => {
     if (!text && commands.length > 0) {
       const firstCmd = commands[0];
       if (firstCmd.type === 'OPEN_APP') {
-        text = `Opening ${firstCmd.app || 'YouTube'} on your device.`;
+        const appTitle = firstCmd.app || 'YouTube';
+        if (isMobileLinkedNow()) {
+          text = `Transmitting over Wi-Fi. Opening ${appTitle} on your device now.`;
+        } else {
+          text = `Directive registered: Opening ${appTitle}. Note: your device is not yet linked on this Wi-Fi. Scan the QR code on your screen or open this link in your phone's Chrome browser to link it.`;
+        }
       } else if (firstCmd.type === 'UNLOCK') {
         text = 'Unlocking your device. Screen active.';
       } else if (firstCmd.type === 'LOCK') {
         text = 'Securing peripheral. Device locked.';
       } else if (firstCmd.type === 'STATUS' || message.toLowerCase().includes('device') || message.toLowerCase().includes('phone')) {
-        text = 'Your device is connected and awaiting your command.';
+        text = isMobileLinkedNow()
+          ? 'Your device is linked over Wi-Fi and awaiting your command.'
+          : 'Your device is awaiting Wi-Fi connection. Scan the QR code on screen to link it.';
       } else {
         text = 'Directive confirmed. Device updated.';
       }
@@ -370,15 +438,8 @@ app.post('/api/ultron/chat', async (req, res) => {
     });
 
     // Broadcast to wireless mobile bridge receivers
-    const clients = bridgeRooms.get('default') || [];
     commands.forEach((cmd) => {
-      clients.forEach((client) => {
-        try {
-          client.res.write(`data: ${JSON.stringify(cmd)}\n\n`);
-        } catch {
-          // stale client
-        }
-      });
+      broadcastBridgeCommand('default', cmd);
     });
 
     return res.json({
@@ -413,15 +474,8 @@ app.post('/api/ultron/chat', async (req, res) => {
       }
     });
     // Broadcast fallback commands to wireless mobile bridge receivers
-    const clients = bridgeRooms.get('default') || [];
     fallback.commands.forEach((cmd) => {
-      clients.forEach((client) => {
-        try {
-          client.res.write(`data: ${JSON.stringify(cmd)}\n\n`);
-        } catch {
-          // stale client
-        }
-      });
+      broadcastBridgeCommand('default', cmd);
     });
 
     return res.json({
@@ -432,15 +486,6 @@ app.post('/api/ultron/chat', async (req, res) => {
     });
   }
 });
-
-// Real-time Wireless Mobile Bridge (SSE relay between Laptop & Mobile phone)
-interface BridgeClient {
-  id: string;
-  res: express.Response;
-  deviceType: string;
-}
-
-const bridgeRooms = new Map<string, BridgeClient[]>();
 
 app.get('/api/bridge/stream', (req, res) => {
   const room = (req.query.room as string) || 'default';
@@ -459,6 +504,15 @@ app.get('/api/bridge/stream', (req, res) => {
   console.log(`[Bridge] ${deviceType} connected to room '${room}' (Total: ${clients.length})`);
 
   res.write(`data: ${JSON.stringify({ type: 'CONNECTED', clientId, total: clients.length })}\n\n`);
+
+  // Replay recent pending command (within 30 seconds) so user opening the page receives it immediately
+  if (lastPendingCommand && Date.now() - lastPendingTime < 30000) {
+    try {
+      res.write(`data: ${JSON.stringify(lastPendingCommand)}\n\n`);
+    } catch {
+      // ignore
+    }
+  }
 
   const keepAlive = setInterval(() => {
     try {
@@ -482,20 +536,12 @@ app.post('/api/bridge/dispatch', (req, res) => {
     return res.status(400).json({ error: 'Command is required' });
   }
 
+  broadcastBridgeCommand(room, command);
   const clients = bridgeRooms.get(room) || [];
-  let dispatchedCount = 0;
-  clients.forEach((client) => {
-    try {
-      client.res.write(`data: ${JSON.stringify(command)}\n\n`);
-      dispatchedCount++;
-    } catch {
-      // stale
-    }
-  });
 
   return res.json({
     success: true,
-    dispatchedTo: dispatchedCount,
+    dispatchedTo: clients.length,
     room,
   });
 });
@@ -509,6 +555,28 @@ app.get('/api/bridge/status', (req, res) => {
     mobileCount,
     isMobileLinked: mobileCount > 0,
     room,
+  });
+});
+
+app.get('/api/bridge/lan-info', (req, res) => {
+  const ifaces = os.networkInterfaces();
+  let lanIp = '';
+  for (const name of Object.keys(ifaces)) {
+    for (const net of ifaces[name] || []) {
+      if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254.') && !net.address.startsWith('127.')) {
+        lanIp = net.address;
+        break;
+      }
+    }
+    if (lanIp) break;
+  }
+  const host = (req.headers['x-forwarded-host'] as string) || (req.headers.host as string) || 'localhost:3000';
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
+  return res.json({
+    lanIp: lanIp || null,
+    port: PORT,
+    publicUrl: `${proto}://${host}/?mode=mobile`,
+    lanUrl: lanIp ? `http://${lanIp}:${PORT}/?mode=mobile` : null,
   });
 });
 

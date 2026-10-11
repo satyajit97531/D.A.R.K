@@ -166,7 +166,7 @@ export default function MobileReceiver({ onSwitchToOrb }: MobileReceiverProps) {
             const app = (data.app || "youtube").toLowerCase();
             setLastCommand(`OPEN_APP: ${app.toUpperCase()}`);
             setActiveCommand(app);
-            setCountdown(6);
+            setCountdown(10);
             addLog(`>>> COMMAND FROM LAPTOP: Launch ${app.toUpperCase()}`);
             ultronAudio.playAppLaunch();
 
@@ -180,7 +180,7 @@ export default function MobileReceiver({ onSwitchToOrb }: MobileReceiverProps) {
 
             // Set countdown to auto-dismiss overlay
             clearInterval(countdownIntervalRef.current);
-            let remaining = 6;
+            let remaining = 10;
             countdownIntervalRef.current = setInterval(() => {
               remaining -= 1;
               setCountdown(remaining);
