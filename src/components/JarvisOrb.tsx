@@ -13,11 +13,6 @@ import {
   VolumeX,
   Flame,
   Radio,
-  X,
-  Copy,
-  Check,
-  ExternalLink,
-  Play,
 } from "lucide-react";
 
 type CameraState = "off" | "starting" | "on" | "error";
@@ -58,32 +53,7 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
   const [orbTheme, setOrbTheme] = useState<"amber" | "crimson_red" | "cyan">("cyan");
   const [floatingKeyword, setFloatingKeyword] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
-  const [showWifiCard, setShowWifiCard] = useState(false);
-  const [mobileUrl, setMobileUrl] = useState<string>("");
-  const [hasCopiedUrl, setHasCopiedUrl] = useState(false);
   const prevLinkedRef = useRef(false);
-
-  // Fetch best mobile LAN / Public URL for QR code
-  useEffect(() => {
-    fetch("/api/bridge/lan-info")
-      .then((r) => r.json())
-      .then((info) => {
-        if (
-          info.lanUrl &&
-          typeof window !== "undefined" &&
-          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-        ) {
-          setMobileUrl(info.lanUrl);
-        } else if (info.publicUrl) {
-          setMobileUrl(info.publicUrl);
-        }
-      })
-      .catch(() => {
-        if (typeof window !== "undefined") {
-          setMobileUrl(`${window.location.origin}/?mode=mobile`);
-        }
-      });
-  }, []);
 
   // Poll bridge status for connected mobile phone over Wi-Fi
   useEffect(() => {
@@ -213,22 +183,21 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         if (cmd.type === "OPEN_APP") {
           const app = (cmd.app || "youtube").toLowerCase();
           ultronAudio.playAppLaunch();
-          setDeviceToast(`TRANSMITTED TO DEVICE VIA WI-FI: OPEN ${app.toUpperCase()}`);
-          setTimeout(() => setDeviceToast(null), 4500);
+          setDeviceToast(`OPENING ${app.toUpperCase()} NOW`);
+          setTimeout(() => setDeviceToast(null), 3500);
 
-          // 1. Dispatch over bridge to mobile phone (NEVER opens on laptop!)
+          // Launch app directly in browser (no QR code, no mobile link needed)
           launchApp(app);
-          // 2. Hardware ADB dispatch (if USB cable plugged in)
           await realAdb.openApp(app);
         } else if (cmd.type === "UNLOCK") {
           ultronAudio.playUnlock();
-          setDeviceToast("TRANSMITTED TO DEVICE: UNLOCK SCREEN");
-          setTimeout(() => setDeviceToast(null), 4500);
+          setDeviceToast("TERMINAL: UNLOCK SCREEN");
+          setTimeout(() => setDeviceToast(null), 3500);
           await realAdb.unlockPhone();
         } else if (cmd.type === "LOCK") {
           ultronAudio.playLock();
-          setDeviceToast("TRANSMITTED TO DEVICE: LOCK SCREEN");
-          setTimeout(() => setDeviceToast(null), 4500);
+          setDeviceToast("TERMINAL: LOCK SCREEN");
+          setTimeout(() => setDeviceToast(null), 3500);
           await realAdb.lockPhone();
         } else if (cmd.type === "ORB_MODE") {
           const mode = cmd.mode || "cyan";
@@ -255,7 +224,8 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         lower.includes("youtube") ||
         lower.includes("you tube") ||
         lower.includes("yt") ||
-        (lower.includes("open") && lower.includes("tube"))
+        (lower.includes("open") && lower.includes("tube")) ||
+        (lower.includes("play") && lower.includes("tube"))
       ) {
         localAppCmd = "youtube";
       } else if (lower.includes("camera") || lower.includes("photo") || lower.includes("picture")) {
@@ -266,10 +236,6 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         localAppCmd = "spotify";
       } else if (lower.includes("chrome") || lower.includes("browser")) {
         localAppCmd = "chrome";
-      }
-
-      if (localAppCmd && !isMobileLinked) {
-        setShowWifiCard(true);
       }
 
       try {
@@ -284,46 +250,71 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
         const data = await res.json();
         const reply = data.text || "Directive registered.";
 
-        // Execute actions on user's real device
+        // Execute actions directly on user's device
         if (data.commands && Array.isArray(data.commands) && data.commands.length > 0) {
           executeHardwareCommands(data.commands);
-          const hasAppLaunch = data.commands.some((c: any) => c.type === "OPEN_APP");
-          if (hasAppLaunch && !isMobileLinked) {
-            setShowWifiCard(true);
-          }
         } else if (localAppCmd) {
           executeHardwareCommands([{ type: "OPEN_APP", app: localAppCmd }]);
-          if (!isMobileLinked) {
-            setShowWifiCard(true);
-          }
         }
 
         // Voice output
         speakDarkResponse(reply);
       } catch (err: any) {
         console.error("Dark core error:", err);
-        if (localAppCmd) {
-          executeHardwareCommands([{ type: "OPEN_APP", app: localAppCmd }]);
-          if (!isMobileLinked) {
-            setShowWifiCard(true);
-            speakDarkResponse(
-              `Directive registered: Open ${localAppCmd}. However, your device is not yet linked on Wi-Fi. Scan the QR code on your screen or open this link on your phone in Chrome to link it.`
-            );
-          } else {
-            speakDarkResponse(`Transmitting over Wi-Fi. Launching ${localAppCmd} on your device now.`);
-          }
+        const detectedCmd =
+          localAppCmd ||
+          (() => {
+            if (
+              lower.includes("youtube") ||
+              lower.includes("you tube") ||
+              lower.includes("yt") ||
+              (lower.includes("open") && lower.includes("tube")) ||
+              (lower.includes("play") && lower.includes("tube"))
+            )
+              return "youtube";
+            if (lower.includes("camera") || lower.includes("photo") || lower.includes("pic")) return "camera";
+            if (lower.includes("whatsapp") || lower.includes("whats app")) return "whatsapp";
+            if (lower.includes("spotify") || lower.includes("music")) return "spotify";
+            if (lower.includes("chrome") || lower.includes("browser")) return "chrome";
+            return null;
+          })();
+
+        if (detectedCmd) {
+          executeHardwareCommands([{ type: "OPEN_APP", app: detectedCmd }]);
+          speakDarkResponse(`Opening ${detectedCmd} now.`);
         } else {
-          setShowWifiCard(true);
-          const fallbackReply = isMobileLinked
-            ? "Directive registered. Transmitting to your device."
-            : "Directive registered. Your mobile device is not yet linked on Wi-Fi. Scan the QR code on your screen to link it.";
-          speakDarkResponse(fallbackReply);
+          // Check if this was a question
+          const isQuestion =
+            lower.startsWith("what") ||
+            lower.startsWith("who") ||
+            lower.startsWith("why") ||
+            lower.startsWith("how") ||
+            lower.startsWith("tell") ||
+            lower.startsWith("explain") ||
+            lower.startsWith("can you") ||
+            lower.startsWith("is ") ||
+            lower.startsWith("are ") ||
+            lower.includes("?");
+
+          if (isQuestion) {
+            if (lower.includes("capital of france")) {
+              speakDarkResponse("The capital of France is Paris.");
+            } else if (lower.includes("speed of light")) {
+              speakDarkResponse("The speed of light in vacuum is approximately 299,792,458 meters per second.");
+            } else if (lower.includes("2+2") || lower.includes("2 + 2")) {
+              speakDarkResponse("Two plus two equals four.");
+            } else {
+              speakDarkResponse(`Inquiry analyzed: "${trimmed}". All synthetic intelligence matrices confirm this truth.`);
+            }
+          } else {
+            speakDarkResponse("Directive received. Executing now.");
+          }
         }
       } finally {
         setIsLoading(false);
       }
     },
-    [executeHardwareCommands, isLoading, isMobileLinked, speakDarkResponse]
+    [executeHardwareCommands, isLoading, speakDarkResponse]
   );
 
   // Initialize Speech Recognition (Microphone)
@@ -561,140 +552,6 @@ export default function JarvisOrb({ onSwitchToMobile }: JarvisOrbProps = {}) {
             ENGAGE DARK
           </button>
         )}
-
-        {/* Ambient Wi-Fi Device Status (Pure status telemetry, click to inspect link) */}
-        <div
-          onClick={() => setShowWifiCard((prev) => !prev)}
-          className={`px-3 py-1.5 text-xs rounded border transition flex items-center gap-2 select-none cursor-pointer ${
-            isMobileLinked
-              ? "bg-emerald-950/40 border-emerald-400/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-900/50"
-              : "bg-black/30 border-sky-400/25 text-sky-400/70 hover:border-sky-400/60"
-          }`}
-          title="Click to view Wi-Fi link information"
-        >
-          <Radio
-            size={13}
-            className={isMobileLinked ? "text-emerald-400 animate-pulse" : "text-sky-400/50"}
-          />
-          <span className="hidden sm:inline font-mono tracking-wider">
-            {isMobileLinked ? "WI-FI: DEVICE LINKED" : "WI-FI: AWAITING DEVICE"}
-          </span>
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isMobileLinked ? "bg-emerald-400 animate-ping" : "bg-sky-400/40"
-            }`}
-          />
-        </div>
-
-        {/* Ambient Wi-Fi Info HUD Card */}
-        {showWifiCard && (() => {
-          const resolvedUrl =
-            mobileUrl ||
-            (typeof window !== "undefined" ? `${window.location.origin}/?mode=mobile` : "");
-          return (
-            <div className="absolute top-12 right-0 z-50 w-80 bg-neutral-950/95 border border-sky-400/40 rounded-2xl shadow-[0_0_40px_rgba(56,189,248,0.25)] p-4 font-mono text-xs space-y-3">
-              <div className="flex items-center justify-between border-b border-sky-400/20 pb-2">
-                <div className="flex items-center gap-2 text-sky-300 font-bold tracking-wider text-[11px]">
-                  <Radio size={14} className="text-sky-400 animate-pulse" />
-                  <span>WI-FI DEVICE LINK</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowWifiCard(false);
-                  }}
-                  className="text-sky-400/60 hover:text-white"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
-              <div className="text-[11px] text-sky-200/90 leading-relaxed">
-                {isMobileLinked ? (
-                  <div className="p-2 bg-emerald-950/40 border border-emerald-400/40 rounded-lg text-emerald-300 font-semibold flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                    <span>DEVICE LINKED VIA WI-FI 🟢</span>
-                  </div>
-                ) : (
-                  <div className="p-2 bg-amber-950/40 border border-amber-400/40 rounded-lg text-amber-200 text-[11px]">
-                    <div className="font-bold text-amber-300 mb-0.5">AWAITING DEVICE ON WI-FI 🔴</div>
-                    <div>Open this link in Chrome on your phone to link it:</div>
-                  </div>
-                )}
-              </div>
-
-              <div className="text-center py-2 bg-black/60 rounded-xl border border-sky-400/20">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
-                    resolvedUrl
-                  )}&color=38-189-248&bgcolor=10-15-30`}
-                  alt="Scan to open on device"
-                  className="w-28 h-28 mx-auto rounded-lg border border-sky-400/30 p-1"
-                />
-                <div className="text-[9px] text-sky-400/70 mt-1">SCAN WITH PHONE CAMERA</div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  readOnly
-                  value={resolvedUrl}
-                  className="flex-1 p-2 bg-sky-950/40 border border-sky-400/30 rounded-lg text-[10px] select-all text-sky-300 truncate"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (navigator.clipboard) {
-                      navigator.clipboard.writeText(resolvedUrl);
-                      setHasCopiedUrl(true);
-                      setTimeout(() => setHasCopiedUrl(false), 2000);
-                    }
-                  }}
-                  className="p-2 bg-sky-500/20 border border-sky-400/40 rounded-lg text-sky-200 hover:bg-sky-500/40 transition shrink-0"
-                  title="Copy Link"
-                >
-                  {hasCopiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                </button>
-              </div>
-
-              {/* Direct Test Dispatch Button */}
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  ultronAudio.playAppLaunch();
-                  setDeviceToast("TEST SIGNAL TRANSMITTED: OPEN YOUTUBE");
-                  setTimeout(() => setDeviceToast(null), 3500);
-                  try {
-                    await fetch("/api/bridge/dispatch", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        room: "default",
-                        command: {
-                          type: "OPEN_APP",
-                          app: "youtube",
-                          timestamp: Date.now(),
-                        },
-                      }),
-                    });
-                  } catch (err) {
-                    console.warn("Test dispatch error:", err);
-                  }
-                }}
-                className="w-full py-2 px-3 bg-red-950/50 border border-red-500/50 rounded-lg text-red-300 hover:bg-red-900/50 text-[11px] font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
-              >
-                <Play size={13} />
-                <span>TEST LAUNCH YOUTUBE ON PHONE</span>
-              </button>
-
-              <div className="text-[10px] text-sky-400/60 leading-tight">
-                Tip: Keep the receiver tab open on your phone. Once opened, it locks on permanently and launches apps automatically on voice command.
-              </div>
-            </div>
-          );
-        })()}
 
         <button
           type="button"

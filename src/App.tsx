@@ -17,11 +17,8 @@ export default function App() {
       const modeParam = params.get("mode");
       if (modeParam === "mobile") {
         setIsMobileMode(true);
-      } else if (modeParam === "orb") {
-        setIsMobileMode(false);
       } else {
-        // Automatically detect if running on mobile device
-        setIsMobileMode(isMobileDevice());
+        setIsMobileMode(false);
       }
     }
   }, []);

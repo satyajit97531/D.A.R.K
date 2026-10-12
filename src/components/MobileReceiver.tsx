@@ -215,8 +215,14 @@ export default function MobileReceiver({ onSwitchToOrb }: MobileReceiverProps) {
 
     connect();
 
+    // Heartbeat ping so laptop knows phone is active on Wi-Fi
+    const pingInterval = setInterval(() => {
+      fetch("/api/bridge/ping?room=default&type=mobile").catch(() => {});
+    }, 10000);
+
     return () => {
       isCancelled = true;
+      clearInterval(pingInterval);
       clearTimeout(retryTimeout);
       clearInterval(countdownIntervalRef.current);
       eventSource?.close();

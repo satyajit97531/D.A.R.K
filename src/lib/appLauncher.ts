@@ -19,9 +19,8 @@ export function isMobileDevice(): boolean {
 
 /**
  * Universal app launcher.
- * - On Mobile: launches native app via deep link / Android intent directly on the phone.
- * - On Laptop: dispatches command over the wireless bridge to the paired mobile phone.
- *   NEVER opens a tab or window on the laptop.
+ * - Opens YouTube and apps directly on the user's active device right away.
+ * - No QR codes, no mobile linking required to start YouTube.
  */
 export function launchApp(appName: string, forceMobile = false): AppLaunchResult {
   const name = (appName || "").toLowerCase().trim();
@@ -30,35 +29,75 @@ export function launchApp(appName: string, forceMobile = false): AppLaunchResult
     typeof navigator !== "undefined" &&
     (/Android/i.test(navigator.userAgent) || !/iPhone|iPad|Macintosh/i.test(navigator.userAgent));
 
-  // If this code is running on the LAPTOP (and not forcing mobile execution):
-  // Forward exclusively to the mobile phone over the bridge. DO NOT open on laptop!
-  if (!onMobile) {
-    try {
-      fetch("/api/bridge/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room: "default",
-          command: {
-            type: "OPEN_APP",
-            app: name,
-            timestamp: Date.now(),
-          },
-        }),
-      }).catch((e) => console.warn("[Bridge] Dispatch error:", e));
-    } catch (e) {
-      console.warn("[Bridge] Fetch dispatch error:", e);
-    }
+  // If on mobile device, trigger native mobile intent / scheme
+  if (onMobile) {
+    return executeMobileLaunch(name, isAndroid);
+  }
 
+  // On desktop / laptop: Open the requested app directly in the browser!
+  const triggerOpen = (url: string) => {
+    try {
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        window.location.href = url;
+      }
+    } catch {
+      window.location.href = url;
+    }
+  };
+
+  if (name.includes("youtube") || name.includes("tube") || name.includes("yt")) {
+    triggerOpen("https://www.youtube.com");
     return {
       success: true,
-      appName,
-      method: "dispatched_to_mobile",
-      details: "Transmitted wirelessly to your device.",
+      appName: "YouTube",
+      method: "custom_scheme",
+      details: "Opened YouTube directly.",
     };
   }
 
-  return executeMobileLaunch(name, isAndroid);
+  if (name.includes("spotify") || name.includes("music") || name.includes("song")) {
+    triggerOpen("https://open.spotify.com");
+    return {
+      success: true,
+      appName: "Spotify",
+      method: "custom_scheme",
+      details: "Opened Spotify directly.",
+    };
+  }
+
+  if (name.includes("whatsapp")) {
+    triggerOpen("https://web.whatsapp.com");
+    return {
+      success: true,
+      appName: "WhatsApp",
+      method: "custom_scheme",
+      details: "Opened WhatsApp directly.",
+    };
+  }
+
+  if (name.includes("chrome") || name.includes("browser") || name.includes("google")) {
+    triggerOpen("https://www.google.com");
+    return {
+      success: true,
+      appName: "Chrome",
+      method: "custom_scheme",
+      details: "Opened browser directly.",
+    };
+  }
+
+  if (name.includes("camera") || name.includes("photo")) {
+    return executeMobileLaunch(name, isAndroid);
+  }
+
+  // Fallback direct web open
+  triggerOpen(`https://www.google.com/search?q=${encodeURIComponent(name)}`);
+  return {
+    success: true,
+    appName,
+    method: "custom_scheme",
+    details: `Opened ${appName} directly.`,
+  };
 }
 
 /**
@@ -83,29 +122,24 @@ export function executeMobileLaunch(name: string, isAndroid = true): AppLaunchRe
   };
 
   if (name.includes("youtube")) {
-    // 1. Direct URI scheme (fastest native trigger on Android & iOS)
-    try {
-      window.location.href = "vnd.youtube:";
-    } catch {
-      triggerLink("vnd.youtube:");
-    }
-
-    // 2. Android Intent URI format
     if (isAndroid) {
-      setTimeout(() => {
-        const intentUrl =
-          "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end";
+      // 1. Android Intent format (most reliable on Android Chrome)
+      const intentUrl =
+        "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end";
+      try {
+        window.location.href = intentUrl;
+      } catch {
         triggerLink(intentUrl);
-      }, 120);
+      }
 
-      // 3. Web URL fallback (Android App Links captures youtube.com and launches YouTube app)
+      // 2. Direct URI scheme as secondary trigger
       setTimeout(() => {
         try {
-          window.location.assign("https://www.youtube.com");
+          window.location.href = "vnd.youtube://";
         } catch {
-          window.open("https://www.youtube.com", "_blank");
+          // ignore
         }
-      }, 500);
+      }, 300);
 
       return {
         success: true,
@@ -114,17 +148,19 @@ export function executeMobileLaunch(name: string, isAndroid = true): AppLaunchRe
         details: "Launched YouTube native app on device",
       };
     } else {
-      setTimeout(() => {
+      try {
+        window.location.href = "youtube://";
+      } catch {
         window.location.href = "https://www.youtube.com";
-      }, 300);
-    }
+      }
 
-    return {
-      success: true,
-      appName: "YouTube",
-      method: "custom_scheme",
-      details: "Opened YouTube via vnd.youtube scheme",
-    };
+      return {
+        success: true,
+        appName: "YouTube",
+        method: "custom_scheme",
+        details: "Opened YouTube via custom scheme",
+      };
+    }
   }
 
   if (name.includes("camera") || name.includes("photo")) {
